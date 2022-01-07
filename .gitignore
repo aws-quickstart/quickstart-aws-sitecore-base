@@ -1,0 +1,8 @@
+taskcat_outputs/
+.taskcat/
+helm/
+.taskcat_overrides.yml
+.DS_Store
+scratch/
+*scratch*.ps1
+*.zip
