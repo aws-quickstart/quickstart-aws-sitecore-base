@@ -1,0 +1,95 @@
+// Add steps as necessary for accessing the software, post-configuration, and testing. Don’t include full usage instructions for your software, but add links to your product documentation for that information.
+//Should any sections not be applicable, remove them
+
+== Test the deployment
+Use a web browser to find the DNS name you provided for the content delivery role.
+
+To log in to Sitecore, retrieve the administrator password by opening AWS Secrets Manager
+from within the Region where you deployed this Quick Start. Search for “sitecoreadmin” to
+find the password value.
+
+When you have the password, use a web browser to find the DNS name for either the
+content delivery role or content management role. Append `/sitecore/admin` to the DNS
+name. This displays the login screen where you can log in and configure your Sitecore
+environment.
+
+== Post deployment steps
+Once the Quick Start deployment completes successfully, create DNS entries in your
+internet-facing DNS for the content delivery, content management, and identity servers.
+These CNAME entries correspond to the names provided in the initial parameters for the
+deployment and point to the listed `ExternalALBDNS` value in the outputs for `SitecoreStack`.
+
+If you deploy this Quick Start into an existing VPC using your self-managed DNS, you must
+create DNS CNAME entries for the Sitecore roles. The required CNAME host name and
+corresponding load balancer DNS can be found in the outputs of `RolesStack` and `SitecoreStack`,
+respectively. When it’s updated, log in to the instance that hosts the marketing automation
+role, and start the Sitecore marketing automation windows service.
+
+== Best practices for using {partner-product-name} on AWS
+// Provide post-deployment best practices for using the technology on AWS, including considerations such as migrating data, backups, ensuring high performance, high availability, etc. Link to software documentation for detailed information.
+
+Use AWS CloudFormation for ongoing management.
+
+We recommend using the AWS CloudFormation console to manage updates and deletions
+for the resources that this Quick Start creates. Use the Amazon EC2 console, AWS
+command line interface (CLI), or application programming interface (API) to change or
+delete resources created by this Quick Start. Otherwise, future AWS CloudFormation
+operations on the stack may behave unexpectedly.
+
+All Sitecore instances are in the private subnet, so there is no access to them from the
+internet. Both Amazon RDS and Amazon ElastiCache are accessible only from within the
+VPC and not from the internet. All traffic is routed to the Sitecore instances via the
+deployed load balancers.
+
+== Other useful information
+//Provide any other information of interest to users, especially focusing on areas where AWS or cloud usage differs from on-premises usage.
+
+=== Personalized content on Sitecore roles
+Once the deployment of the Sitecore Quick Start is complete, you have a default installation
+of Sitecore XP 9.3 in your AWS account. Your custom Sitecore site must then be deployed to
+the Sitecore roles. Any media for your site (for example, pictures and videos) should be
+stored within an S3 bucket and referenced within the website’s code. Storing local media
+content through Sitecore roles should be avoided because it can increase the load on your
+content instances. It may also affect Auto Scaling because it takes time to transfer media to
+a new instance.
+
+=== Parameter Store
+All Sitecore role installations are done via the Sitecore Installation Framework (SIF). Using
+SIF allows parameters to be passed to the Sitecore role installation when the instance starts
+for the first time. All of these parameters are stored within AWS Systems Manager
+Parameter Store. If any of the values within Parameter Store are updated, the instances can
+be deleted so that when the instance starts up, the Sitecore installation uses the updated
+parameter values. For example, this could be used to update the Solr URL or Solr Core
+prefix for the Sitecore roles.
+
+=== Secrets Manager
+All Sitecore passwords are generated via AWS Secrets Manager. They are referenced when
+the databases are created and the Sitecore roles are installed.
+
+=== Sitecore certificates
+Because Sitecore requires Secure Sockets Layer (SSL) communication between roles, an
+internal self-signed certificate is generated. This certificate is imported into the certificate
+store on the Sitecore AMI and then exported and stored in the S3 bucket provided in the
+deployment parameters. The certificate is then converted and imported into ACM via a
+Lambda function and used on the internal Application Load Balancer for the HTTPS
+listener. All other internal Sitecore roles sit behind their own Network Load Balancers
+because they require TLS pass-through.
+
+The certificate is valid for five years from the date of installation. Should a new certificate be
+needed for the Sitecore deployment, one can be generated by running the `sc-newcerts.ps1 script`, which can be found in the `C:\quickstart\scripts` folder. When it’s
+generated, the certificate must be converted, imported into ACM, and updated on the
+internal Application Load Balancer listener.
+
+=== Sitecore Internet Information Service configurations
+Because Sitecore is a database- and personalization-driven CMS, the Sitecore Internet
+Information Service (IIS) must be configured for preloaded content, and the application
+pool must always be running. When you install a Sitecore role, the corresponding
+application pool is set to `AlwaysRunning` and the website is set to preload content.
+
+=== Redis for session management
+While the content delivery role installs, the Sitecore configuration files update for both
+private- and shared-session management. If these files are overwritten by custom content,
+they must be https://doc.sitecore.com/developers/93/platform-administration-and-architecture/en/walkthrough--configuring-a-shared-session-state-database-using-the-redis-provider.html[updated with the correct Redis details].
+
+The URL for Redis can be found in the CloudFormation outputs, or in the SSM Parameter
+Store.

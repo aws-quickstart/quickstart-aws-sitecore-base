@@ -1,0 +1,225 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "This template deploys RDS with MS SQL and its corresponding Parameter and Subnet Groups, along with ElastiCache for Redis and its corresponding Subnet Group.  (qs-1qppe684a)"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: RDS SQL Configuration
+        Parameters:
+          - DBAutoMinorVersionUpgrade
+          - DBInstanceClass
+          - SQLEngineEdition
+          - SQLEngineVersion
+          - SQLAlwaysOn
+          - BackupRetentionPeriod
+          - VolumeIops
+          - VolumeSize
+          - RDSSecurityGroup
+          - VolumeType
+          - RDSMonitoringRole
+      - Label:
+          default: Redis Configuration
+        Parameters:
+          - RedisSecurityGroup
+          - CacheNodeType
+          - Engine
+          - NumCacheNodes
+          - RedisPort
+      - Label:
+          default: General Configuration
+        Parameters:
+          - PrivateSubnet1AID
+          - PrivateSubnet2AID
+          - SCQSPrefix
+    ParameterLabels:
+      DBAutoMinorVersionUpgrade:
+        default: ''
+      DBInstanceClass:
+        default: 'Database instance class'
+      SQLEngineEdition:
+        default: 'SQL engine edition'
+      SQLEngineVersion:
+        default: 'QSL Version'
+      SQLAlwaysOn:
+        default: MSSQL Always On - Enterprise Edition
+      BackupRetentionPeriod:
+        default: 'Backup retention period'
+      VolumeIops:
+        default: 'Volume IOPS'
+      VolumeSize:
+        default: 'Volume size'
+      RDSSecurityGroup:
+        default: 'Security group'
+      VolumeType:
+        default: 'Volume type'
+      RDSMonitoringRole:
+        default: 'Monitoring Role'
+      RedisSecurityGroup:
+        default: 'Redis Security group'
+      CacheNodeType:
+        default: 'Cache node type'
+      Engine:
+        default: 'Elasticache Engine'
+      NumCacheNodes:
+        default: 'Number of Nodes'
+      RedisPort:
+        default: 'Port'
+      PrivateSubnet1AID:
+        default: 'Private subnet 1 ID'
+      PrivateSubnet2AID:
+        default: 'Private subnet 2 ID'
+      SCQSPrefix:
+        default: 'Sitecore Prefix'
+Parameters:
+# RDS Parameters
+  DBAutoMinorVersionUpgrade: 
+    Type: String
+    Description: ''
+  DBInstanceClass:
+    Type: String
+    Description: ''
+  SQLEngineEdition:
+    Type: String
+    Description: ''
+  SQLEngineVersion:
+    Type: String
+    Description: ''
+  SQLAlwaysOn:
+    Default: 'False'
+    AllowedValues:
+      - 'False'
+      - 'True'
+    Description: "[OPTIONAL] Select 'True' if you would like to have SQL Always-On (High Availability) for the deployment. Be aware that this only applies if
+      selecting 'sqlserver-ee' as the MSSQL database engine edition"
+    Type: String
+  BackupRetentionPeriod:
+    Type: Number
+    Description: ''
+  VolumeIops:
+    Type: Number
+    Description: ''
+  VolumeSize:
+    Type: Number
+    Description: ''
+  RDSSecurityGroup:
+    Type: List<String>
+    Description: ''
+  VolumeType:
+    Type: String
+    Description: ''
+  RDSMonitoringRole:
+    Type: String
+    Description: ''
+# Redis parameters
+  RedisSecurityGroup:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: ''
+  CacheNodeType:
+    Type: String
+    Description: ''
+  Engine:
+    Type: String
+    Description: ''
+  NumCacheNodes:
+    Type: Number
+    Description: ''
+  RedisPort:
+    Type: Number
+    Description: ''
+# General parameters
+  PrivateSubnet1AID:
+    Type: AWS::EC2::Subnet::Id
+    Description: ''
+  PrivateSubnet2AID:
+    Type: AWS::EC2::Subnet::Id
+    Description: ''
+  SCQSPrefix:
+    Type: String
+    Description: ''
+
+Conditions:
+  DBProvisionedIops:
+    !Equals [!Ref VolumeType, io1]
+  SQLEnterprise: !Equals [!Ref 'SQLEngineEdition', 'sqlserver-ee']
+
+Mappings:
+  RDSParameterFamily:
+    sqlserver-ee:
+      family: sqlserver-ee-14.0
+    sqlserver-se:
+      family: sqlserver-se-14.0
+    sqlserver-ex:
+      family: sqlserver-ex-14.0
+    sqlserver-web:
+      family: sqlserver-web-14.0
+
+Resources:
+  RDSParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: !Sub 'RDS Parameter Group for Sitecore MSSQL - ${SCQSPrefix}'
+      Family: !FindInMap [RDSParameterFamily, !Ref SQLEngineEdition, family]
+      Parameters:
+        contained database authentication: '1'
+  RDSSQLDBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties: 
+      DBSubnetGroupDescription: !Sub 'RDS Subnet Group for Sitecore RDS MSSQL - ${SCQSPrefix}'
+      SubnetIds: 
+        - !Ref PrivateSubnet1AID
+        - !Ref PrivateSubnet2AID
+  RDSSQL:
+    Type: "AWS::RDS::DBInstance" 
+    Properties: 
+      AutoMinorVersionUpgrade: !Ref DBAutoMinorVersionUpgrade
+      AllocatedStorage: !Ref VolumeSize
+      BackupRetentionPeriod: !Ref BackupRetentionPeriod
+      DBInstanceClass: !Ref DBInstanceClass
+      DBSubnetGroupName: !Ref RDSSQLDBSubnetGroup
+      Engine: !Ref SQLEngineEdition
+      EngineVersion: !Ref SQLEngineVersion
+      Iops: !If [DBProvisionedIops, !Ref VolumeIops, !Ref 'AWS::NoValue']
+      LicenseModel: license-included
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:sitecore-quickstart-${SCQSPrefix}-sqladmin:SecretString:password}}'
+      MasterUsername: !Sub '{{resolve:secretsmanager:sitecore-quickstart-${SCQSPrefix}-sqladmin:SecretString:username}}'
+      MultiAZ: !If [SQLEnterprise, !Ref SQLAlwaysOn, False]
+      VPCSecurityGroups: !Ref RDSSecurityGroup
+      PubliclyAccessible: false
+      DBParameterGroupName: !Ref RDSParameterGroup
+      DBInstanceIdentifier: !Sub sc-${SCQSPrefix}
+      StorageType: !If [DBProvisionedIops, io1, gp2]
+      MonitoringInterval: 60
+      MonitoringRoleArn: !Ref RDSMonitoringRole
+# Redis Configuration for the Content Delivery role
+  RedisCD:
+    Type: AWS::ElastiCache::CacheCluster
+    Properties:
+      CacheNodeType: !Ref CacheNodeType
+      Engine: !Ref Engine
+      NumCacheNodes: !Ref NumCacheNodes
+      Port: !Ref RedisPort
+      VpcSecurityGroupIds:
+        - !Ref RedisSecurityGroup
+      CacheSubnetGroupName: !Ref RedisSubnetGroup
+  RedisSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: !Sub 'Redis subnet group for Content Delivery - ${SCQSPrefix}'
+      SubnetIds:
+        - !Ref PrivateSubnet1AID
+        - !Ref PrivateSubnet2AID
+# Adding Redis output to Parameter Store for CD Role reference
+  RedisURLParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /${SCQSPrefix}/redis/url
+      Description: Parameter for the Sitecore XP1 Quick Start
+      Type: String 
+      Value: !Sub "${RedisCD.RedisEndpoint.Address}:${RedisCD.RedisEndpoint.Port}"
+Outputs:
+  RDSSQLEndpoint:
+    Description: The SQL Database endpoint for the Sitecore deployment.
+    Value: !Sub "${RDSSQL.Endpoint.Address}:${RDSSQL.Endpoint.Port}"
+  CDRedisEndpoint:
+    Description: The Redis primary endpoint used for the Content Delivery role.
+    Value: !Sub "${RedisCD.RedisEndpoint.Address}:${RedisCD.RedisEndpoint.Port}"

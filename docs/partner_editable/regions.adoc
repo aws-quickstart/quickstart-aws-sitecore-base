@@ -1,0 +1,3 @@
+This deployment includes AWS Secrets Manager, which isn’t currently supported in all
+AWS Regions. For a current list of supported Regions, see https://docs.aws.amazon.com/general/latest/gr/aws-service-information.html[Service endpoints and quotas
+in the AWS documentation].
