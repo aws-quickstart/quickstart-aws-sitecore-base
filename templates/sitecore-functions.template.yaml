@@ -85,10 +85,10 @@ Resources:
       SourceBucket: !Ref 'QSS3BucketName'
       Prefix: !Ref 'QSS3KeyPrefix'
       Objects:
-      - functions/packages/ConvertCertificate/lambda.zip
-      - functions/packages/DeleteBucketContents/lambda.zip
-      - functions/packages/DeleteResources/lambda.zip
-      - functions/packages/ACMCert/lambda.zip
+      - submodules/quickstart-aws-sitecore-base/functions/packages/ConvertCertificate/lambda.zip
+      - submodules/quickstart-aws-sitecore-base/functions/packages/DeleteBucketContents/lambda.zip
+      - submodules/quickstart-aws-sitecore-base/functions/packages/DeleteResources/lambda.zip
+      - submodules/quickstart-aws-sitecore-base/functions/packages/ACMCert/lambda.zip
   RandomStringFunction:
       Type: AWS::Lambda::Function
       Properties:
@@ -137,7 +137,7 @@ Resources:
       Timeout: 900
       Code:
         S3Bucket: !Ref LambdaZipsBucketName
-        S3Key: !Sub '${QSS3KeyPrefix}functions/packages/ConvertCertificate/lambda.zip'
+        S3Key: !Sub '${QSS3KeyPrefix}submodules/quickstart-aws-sitecore-base/functions/packages/ConvertCertificate/lambda.zip'
   DeleteResourcesLambda:
     DependsOn: CopyZips
     Type: AWS::Lambda::Function
@@ -150,7 +150,7 @@ Resources:
       Timeout: 900
       Code:
         S3Bucket: !Ref LambdaZipsBucketName
-        S3Key: !Sub '${QSS3KeyPrefix}functions/packages/DeleteResources/lambda.zip'
+        S3Key: !Sub '${QSS3KeyPrefix}submodules/quickstart-aws-sitecore-base/functions/packages/DeleteResources/lambda.zip'
   DeleteSCResources:
     Type: Custom::CopyZips
     Properties:

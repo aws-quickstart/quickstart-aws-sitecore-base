@@ -128,7 +128,7 @@ Resources:
         S3Bucket:
           Ref: LambdaZipsBucketName
         S3Key:
-          Fn::Sub: ${QSS3KeyPrefix}functions/packages/ACMCert/lambda.zip
+          Fn::Sub: ${QSS3KeyPrefix}submodules/quickstart-aws-sitecore-base/functions/packages/ACMCert/lambda.zip
   ACMCertificateDNS:
     Condition: SetupRoute53
     Type: AWS::CloudFormation::CustomResource
