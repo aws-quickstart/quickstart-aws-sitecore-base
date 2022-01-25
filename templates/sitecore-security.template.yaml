@@ -149,6 +149,13 @@ Resources:
   # IAM Role AMI Instance
   SCAMIInstanceRole:
     Type: 'AWS::IAM::Role'
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks:
+            - EIAMPolicyWildcardResource
+          ignore_reasons:
+            EIAMPolicyWildcardResource: Read-Only access required for all resources
     Properties:
       AssumeRolePolicyDocument:
         Statement:
@@ -209,8 +216,7 @@ Resources:
               - Effect: 'Allow'
                 Action: ssm:GetAutomationExecution
                 Resource:
-                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:document/*:VersionId}'
-                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:automation-definition/*'
+                  - !Sub 'arn:${AWS::Partition}:ssm:*'
         - PolicyName: CWAccess
           PolicyDocument:
             Version: '2012-10-17'
@@ -305,7 +311,7 @@ Resources:
                 Action:
                   - s3:GetBucketLocation
                 Resource:
-                  - 'arn:aws:s3:::*'
+                  - !Sub 'arn:${AWS::Partition}:s3:::*'
         - PolicyName: CWAccess
           PolicyDocument:
             Version: '2012-10-17'
@@ -353,6 +359,13 @@ Resources:
   # Create IAM Role for SSM Automation
   SCAutomationRole:
     Type: 'AWS::IAM::Role'
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks:
+            - EIAMPolicyWildcardResource
+          ignore_reasons:
+            EIAMPolicyWildcardResource: Read-Only access required for all resources
     Properties:
       AssumeRolePolicyDocument:
         Statement:
@@ -379,16 +392,14 @@ Resources:
                 Action:
                   - ec2:DescribeInstances
                   - ec2:DescribeInstanceStatus
-                Resource:
-                  - !Sub 'arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:*'
+                Resource: '*'
         - PolicyName: RDSAccess
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: 'Allow'
                 Action: ['rds:DescribeDBInstances']
-                Resource:
-                  - !Sub 'arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:*'
+                Resource: '*'
         - PolicyName: SSMAccess
           PolicyDocument:
             Version: '2012-10-17'
