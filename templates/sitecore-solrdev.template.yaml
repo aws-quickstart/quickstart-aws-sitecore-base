@@ -110,7 +110,8 @@ Resources:
               - Effect: "Allow"
                 Action:
                   - logs:CreateLogGroup
-                Resource: "*"
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:logs:*'
         - PolicyName: SSMParameters
           PolicyDocument:
             Version: "2012-10-17"

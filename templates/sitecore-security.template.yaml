@@ -71,7 +71,8 @@ Resources:
                 Action:
                   - acm:ImportCertificate
                   - acm:DeleteCertificate
-                Resource: '*'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:acm:*'
         - PolicyName: Get-Secret-Value
           PolicyDocument:
             Version: '2012-10-17'
@@ -109,7 +110,8 @@ Resources:
               - Effect: Allow
                 Action:
                   - ec2:DeregisterImage
-                Resource: '*'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:image/*'
         - PolicyName: SSM-ParameterStore
           PolicyDocument:
             Version: '2012-10-17'
@@ -206,7 +208,9 @@ Resources:
                   - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:automation-definition/*'
               - Effect: 'Allow'
                 Action: ssm:GetAutomationExecution
-                Resource: '*'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:document/*:VersionId}'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:automation-definition/*'
         - PolicyName: CWAccess
           PolicyDocument:
             Version: '2012-10-17'
@@ -254,7 +258,7 @@ Resources:
                 Action:
                   - ssmmessages:*
                 Resource:
-                  - '*'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:*'
   SCAMIInstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
@@ -318,7 +322,8 @@ Resources:
               - Effect: 'Allow'
                 Action:
                   - logs:CreateLogGroup
-                Resource: '*'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:logs:*'
         - PolicyName: SSMParameters
           PolicyDocument:
             Version: '2012-10-17'
@@ -330,7 +335,7 @@ Resources:
               - Effect: 'Allow'
                 Action:
                   - ssm:DescribeParameters
-                Resource: '*'
+                Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:*'
         - PolicyName: SECAccess
           PolicyDocument:
             Version: '2012-10-17'
@@ -374,14 +379,16 @@ Resources:
                 Action:
                   - ec2:DescribeInstances
                   - ec2:DescribeInstanceStatus
-                Resource: '*'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:*'
         - PolicyName: RDSAccess
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: 'Allow'
                 Action: ['rds:DescribeDBInstances']
-                Resource: '*'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:*'
         - PolicyName: SSMAccess
           PolicyDocument:
             Version: '2012-10-17'
