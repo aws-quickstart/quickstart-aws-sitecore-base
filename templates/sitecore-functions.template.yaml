@@ -1,0 +1,199 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Deploys Lambda functions required for the AWS Sitecore Quick Start (qs-1qppe684s)
+Parameters:
+  LambdaZipsBucketName:
+    Description: Bucket Name where the lambda zip files should be placed
+    Type: String
+  QSS3BucketName:
+    AllowedPattern: ^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$
+    ConstraintDescription: 'Quick Start bucket name can include numbers, lowercase
+      letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen
+      (-).'
+    Default: aws-quickstart
+    Description: 'S3 bucket name for the Quick Start assets. This string can include
+      numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start
+      or end with a hyphen (-).'
+    Type: String
+  QSS3KeyPrefix:
+    AllowedPattern: ^[0-9a-zA-Z-/.]*$
+    ConstraintDescription: Quick Start key prefix can include numbers, lowercase letters,
+      uppercase letters, hyphens (-), dots(.) and forward slash (/).
+    Default: quickstart-sitecore-xp/
+    Description: S3 key prefix for the Quick Start assets. Quick Start key prefix
+      can include numbers, lowercase letters, uppercase letters, hyphens (-), dots(.) and
+      forward slash (/).
+    Type: String
+  CopyZipsRoleArn:
+    Type: String
+    Description: 'IAM Role ARN for copying lambda zip files'
+  ConvertCertsRoleArn:
+    Type: String
+    Description: 'IAM Role ARN for creating ACM Certificates'
+  DeleteResourcesRoleArn:
+    Type: String
+    Description: 'IAM Role ARN for deleteing Sitecore resources'
+  SitecorePrefix:
+    Type: String
+    Description: 'The Sitecore Prefix for the Quick Start deployment'
+
+Resources:
+  CopyZipsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Copies objects from a source S3 bucket to a destination
+      Handler: index.handler
+      Runtime: python3.7
+      Role: !Ref CopyZipsRoleArn
+      Timeout: 900
+      Code:
+        ZipFile: |
+          import cfnresponse
+          import logging
+          import boto3
+          logger = logging.getLogger(__name__)
+          def copy_objects(source_bucket, dest_bucket, prefix, objects):
+              s3 = boto3.client('s3')
+              for o in objects:
+                  key = prefix + o
+                  copy_source = {'Bucket': source_bucket, 'Key': key}
+                  logging.info(f'copy_source: {copy_source}\ndest_bucket: {dest_bucket}\nkey: {key}')
+                  s3.copy_object(CopySource=copy_source, Bucket=dest_bucket, Key=key)
+          def delete_objects(bucket, prefix, objects):
+              s3 = boto3.client('s3')
+              objects = {'Objects': [{'Key': prefix + o} for o in objects]}
+              s3.delete_objects(Bucket=bucket, Delete=objects)
+          def handler(event, context):
+              logger.debug(event)
+              status = cfnresponse.SUCCESS
+              try:
+                  if event['RequestType'] == 'Delete':
+                      delete_objects(event['ResourceProperties']['DestBucket'], event['ResourceProperties']['Prefix'],
+                                     event['ResourceProperties']['Objects'])
+                  else:
+                      copy_objects(event['ResourceProperties']['SourceBucket'], event['ResourceProperties']['DestBucket'],
+                                   event['ResourceProperties']['Prefix'], event['ResourceProperties']['Objects'])
+              except Exception:
+                  logging.error('Unhandled exception', exc_info=True)
+                  status = cfnresponse.FAILED
+              finally:
+                  cfnresponse.send(event, context, status, {}, None)
+  CopyZips:
+    Type: Custom::CopyZips
+    Properties:
+      ServiceToken: !GetAtt 'CopyZipsFunction.Arn'
+      DestBucket: !Ref LambdaZipsBucketName
+      SourceBucket: !Ref 'QSS3BucketName'
+      Prefix: !Ref 'QSS3KeyPrefix'
+      Objects:
+      - submodules/quickstart-aws-sitecore-base/functions/packages/ConvertCertificate/lambda.zip
+      - submodules/quickstart-aws-sitecore-base/functions/packages/DeleteBucketContents/lambda.zip
+      - submodules/quickstart-aws-sitecore-base/functions/packages/DeleteResources/lambda.zip
+      - submodules/quickstart-aws-sitecore-base/functions/packages/ACMCert/lambda.zip
+  RandomStringFunction:
+      Type: AWS::Lambda::Function
+      Properties:
+        Description: Generates a random string for resource names
+        Handler: index.handler
+        Runtime: python3.7
+        Role: !Ref CopyZipsRoleArn
+        Timeout: 900
+        Code:
+          ZipFile: |
+            import cfnresponse
+            import logging
+            import random
+            import string
+            logger = logging.getLogger(__name__)
+            def randomStringDigits(stringLength=16):
+                lettersAndDigits = string.ascii_letters + string.digits
+                return ''.join(random.choice(lettersAndDigits) for i in range(stringLength))
+            def handler(event, context):
+                logger.debug(event)
+                status = cfnresponse.SUCCESS
+                try:
+                    cfnData = event['ResourceProperties']['RandomLength']
+                    randomkey = randomStringDigits(int(cfnData))
+                    responseData = {}
+                    responseData['key'] = randomkey
+                except Exception:
+                    logging.error('Unhandled exception', exc_info=True)
+                    status = cfnresponse.FAILED
+                finally:
+                    cfnresponse.send(event, context, status, responseData, None)
+  RandomString:
+    Type: Custom::RandomString
+    Properties:
+      ServiceToken: !GetAtt 'RandomStringFunction.Arn'
+      RandomLength: 8
+  ConvertCertificatesLambda:
+    DependsOn: CopyZips
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Converts Sitecore generated certificates and adds to Amazon Certificate Manager.
+      Handler: lambda_function.handler
+      MemorySize: 128
+      Role: !Ref ConvertCertsRoleArn
+      Runtime: python3.6
+      Timeout: 900
+      Code:
+        S3Bucket: !Ref LambdaZipsBucketName
+        S3Key: !Sub '${QSS3KeyPrefix}submodules/quickstart-aws-sitecore-base/functions/packages/ConvertCertificate/lambda.zip'
+  DeleteResourcesLambda:
+    DependsOn: CopyZips
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Removes Sitecore Quick Start script generated SSM Parameters and EC2 Sitecore AMI. AMI Snapshot is retained.
+      Handler: lambda_function.handler
+      MemorySize: 128
+      Role: !Ref DeleteResourcesRoleArn
+      Runtime: python3.7
+      Timeout: 900
+      Code:
+        S3Bucket: !Ref LambdaZipsBucketName
+        S3Key: !Sub '${QSS3KeyPrefix}submodules/quickstart-aws-sitecore-base/functions/packages/DeleteResources/lambda.zip'
+  DeleteSCResources:
+    Type: Custom::CopyZips
+    Properties:
+      ServiceToken: !GetAtt 'DeleteResourcesLambda.Arn'
+      certThumbprint: !Join 
+          - ''
+          - - '/'
+            - !Ref SitecorePrefix
+            - '-qs-'
+            - !GetAtt RandomString.key
+            - '/cert/instance/thumbprint'
+      rdsSql: !Join 
+          - ''
+          - - '/'
+            - !Ref SitecorePrefix
+            - '-qs-'
+            - !GetAtt RandomString.key
+            - '/sql/server'
+      amiId: !Join 
+          - ''
+          - - '/'
+            - !Ref SitecorePrefix
+            - '-qs-'
+            - !GetAtt RandomString.key
+            - '/instance/ami/customid'
+      amiInstanceId: !Join 
+          - ''
+          - - '/'
+            - !Ref SitecorePrefix
+            - '-qs-'
+            - !GetAtt RandomString.key
+            - '/instance/image/custom'
+Outputs:
+  ConvertCertificatesLambdaArn:
+    Description: The Lambda ARN of the function created to convert the locally generated certificates and upload them to ACM
+    Value: !GetAtt ConvertCertificatesLambda.Arn
+  SitecoreRandomString:
+    Description: The random string generated by Lambda
+    Value: !GetAtt RandomString.key
+  SCQSPrefix:
+    Description: The Generated string for Sitecore Quick Start resources.
+    Value: !Join 
+      - ''
+      - - !Ref SitecorePrefix
+        - '-qs-'
+        - !GetAtt RandomString.key 

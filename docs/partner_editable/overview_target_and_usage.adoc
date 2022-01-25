@@ -1,0 +1,17 @@
+// Replace the content in <>
+// Identify your target audience and explain how/why they would use this Quick Start.
+//Avoid borrowing text from third-party websites (copying text from AWS service documentation is fine). Also, avoid marketing-speak, focusing instead on the technical aspect.
+
+The Sitecore Experience Platform (XP) is a content management system (CMS) for web
+content that automates marketing to deliver a personalized user experience. This Quick
+Start is intended for organizations that want to deploy a multirole Sitecore XP 9.3
+architecture on the AWS Cloud.
+This Quick Start provides step-by-step instructions to deploy 12 roles that compose the
+complete Sitecore XP platform. All of the roles are deployed into individual Auto Scaling
+groups to ensure recoverability when an instance fails. Database services are provided by
+SQL Server through Amazon Relational Database Service (Amazon RDS), and caching is
+managed by Redis on Amazon ElastiCache.
+To control access, this deployment uses AWS Certificate Manager (ACM) and AWS Secrets
+Manager. Other services used by this Quick Start include Amazon Simple Storage Service
+(Amazon S3), AWS Systems Manager, Amazon CloudWatch, AWS Lambda, and Amazon
+Route 53.

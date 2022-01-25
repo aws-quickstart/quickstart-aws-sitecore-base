@@ -1,0 +1,15 @@
+:quickstart-project-name: quickstart-sitecore-xp
+:partner-product-name: Sitecore XP 9.3
+:partner-company-name: Sitecore
+:doc-month: May
+:doc-year: 2020
+:partner-contributors: 
+:quickstart-contributors: Dylan Owen and Tony Bulding, AWS Quick Start team
+:deployment_time: 1–1.5 hours
+:default_deployment_region: us-east-1
+:production_build:
+// Uncomment these two attributes if you are leveraging
+// - an AWS Marketplace listing.
+// Additional content will be auto-generated based on these attributes.
+// :marketplace_subscription:
+// :marketplace_listing_url: https://example.com/

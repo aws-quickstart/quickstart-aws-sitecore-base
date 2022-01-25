@@ -1,0 +1,10 @@
+// Include details about the license and how they can sign up. If no license is required, clarify that. 
+
+This Quick Start requires a Sitecore XP 9.3 license. To use the Quick Start in your
+production environment, https://www.sitecore.com/knowledge-center/getting-started/developer-trial[sign up for a developer trial license]. For a full license, contact a
+Sitecore sales representative or Sitecore partner. Before you launch the Quick Start, place
+the license key in the deployment’s associated S3 bucket, and specify its location. For more
+information, see the <<_prepare_for_the_deployment,Prepare for the deployment>> section.
+
+If you don’t have a license, the Quick Start deployment will not complete successfully.
+

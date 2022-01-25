@@ -1,0 +1,238 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "Creates a development (Non-Production) Solr Instance (qs-1qppe687o)"
+Parameters:
+  PrivateSubnet1A:
+    Type: AWS::EC2::Subnet::Id
+    Description: ''
+  PrivateSubnet2A:
+    Type: AWS::EC2::Subnet::Id
+    Description: ''
+  SolrInstanceType:
+    Type: String
+    Description: ''
+  SolrInstanceSG:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: ''
+  SolrKeyPair:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: ''
+  SCQSPrefix:
+    Type: String
+    Description: ''
+  LocalQSScripts:
+    Type: String
+    Description: ''
+  R53HostedZoneID: # Gets passed in if R53HostedZoneID isnt '' (This will be the created or provided hostedzoneID)
+    Type: String 
+    Description: ''
+  S3BucketName:
+    Type: String
+    Description: ''
+  QSS3BucketName:
+    Type: String
+    Description: ''
+  AutoscalingSNS:
+    Type: String
+    Description: ''
+  LoadBalancerInternalDNS:
+    Type: String
+    Description: ''
+  VPCID:
+    Type: AWS::EC2::VPC::Id
+    Description: ''
+  InternalCertificateARN:
+    Type: String
+    Description: ''
+  LoadBalancerInternal:
+    Type: String
+    Description: ''
+  
+Conditions:
+  CreateSolrR53Record: !Not [!Equals [!Ref R53HostedZoneID, '']] # If not '' then create the record in R53.
+  
+Resources:
+  SitecoreCustomSolrSSM:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /${SCQSPrefix}/service/customsolr
+      Description: Parameter for the Sitecore XP1 Quick Start
+      Type: String 
+      Value: 'Quickstart-Solr-Dev' # Corresponds to the sc-role-prep.ps1 script
+# Solr Role for Instances
+  SolrInstanceRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - "sts:AssumeRole"
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+                - lambda.amazonaws.com
+            Effect: Allow
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource: 
+                  - !Sub "arn:${AWS::Partition}:s3:::${QSS3BucketName}/*"
+                  - !Sub "arn:${AWS::Partition}:s3:::${QSS3BucketName}"
+              - Effect: "Allow"
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::${S3BucketName}/*"
+                  - !Sub "arn:${AWS::Partition}:s3:::${S3BucketName}"
+        - PolicyName: CWAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - logs:CreateLogStream
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:*:log-stream:*"
+                  - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:*"
+              - Effect: "Allow"
+                Action:
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:logs:*'
+        - PolicyName: SSMParameters
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - ssm:GetParameter
+                  - ssm:PutParameter
+                Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/*"
+        - PolicyName: SECAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:*"
+        - PolicyName: R53Updates
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - route53:ListResourceRecordSets
+                  - route53:ChangeResourceRecordSets
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:route53:::hostedzone/${R53HostedZoneID}"
+  SCInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref SolrInstanceRole
+  # Create SolrDev R53 record
+  SolrDevR53Record:
+    Type: AWS::Route53::RecordSet
+    Condition: CreateSolrR53Record
+    Properties:
+      HostedZoneId: !Ref R53HostedZoneID
+      Name: !Sub '{{resolve:ssm:/${SCQSPrefix}/service/solrdevfqdn:1}}' # !Sub solrdev.${IntDNS}
+      Type: CNAME
+      TTL: '900'
+      ResourceRecords:
+        - !Ref LoadBalancerInternalDNS
+  # Solr Target Group
+  SolrDevTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckPort: '8983'
+      HealthCheckProtocol: HTTPS
+      HealthCheckPath: '/solr'
+      Matcher:
+        HttpCode: '302'
+      Port: 8983
+      Protocol: HTTPS
+      TargetType: instance
+      VpcId: !Ref VPCID
+      Tags:
+        - Key: !Sub SolrDev-${SCQSPrefix}
+          Value: "NonProduction : This solr deployemt is for developemnt and is not produciton ready"
+  # Listener for internal ALB
+  HTTPSListenerInternal:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      Certificates:
+        - CertificateArn: !Ref InternalCertificateARN
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref SolrDevTargetGroup
+      LoadBalancerArn: !Ref LoadBalancerInternal
+      Port: 8983
+      Protocol: HTTPS
+# Solr installation
+  SolrDevASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    CreationPolicy: # Wait for the instance to signal that it is created
+      ResourceSignal:
+        Timeout: PT25M
+        Count: 1
+    Properties:
+      LaunchConfigurationName: !Ref SolrDevLC
+      MaxSize: '1'
+      MinSize: '1'
+      DesiredCapacity: '1'
+      VPCZoneIdentifier: 
+        - !Ref PrivateSubnet1A
+        - !Ref PrivateSubnet2A
+      TargetGroupARNs:
+        - !Ref SolrDevTargetGroup
+      NotificationConfigurations:
+        - TopicARN: !Ref AutoscalingSNS
+          NotificationTypes:
+            - autoscaling:EC2_INSTANCE_LAUNCH
+            - autoscaling:EC2_INSTANCE_LAUNCH_ERROR
+            - autoscaling:EC2_INSTANCE_TERMINATE
+            - autoscaling:EC2_INSTANCE_TERMINATE_ERROR
+      Tags:
+      - Key: Name
+        Value: !Sub Solr-${SCQSPrefix}
+        PropagateAtLaunch: true
+  SolrDevLC:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: !Sub '{{resolve:ssm:/${SCQSPrefix}/instance/ami/customid:1}}'
+      InstanceType: !Ref SolrInstanceType
+      SecurityGroups:
+        - !Ref SolrInstanceSG
+      IamInstanceProfile: !Ref SCInstanceProfile
+      KeyName: !Ref SolrKeyPair
+      UserData: !Base64
+        Fn::Join:
+          - ''
+          - - "<powershell>\n"
+            - !Sub '${LocalQSScripts}\solr-dev-install.ps1 -SCQSPrefix '
+            - !Sub '"${SCQSPrefix}" -hostedZoneID '
+            - !Sub '"${R53HostedZoneID}"'
+            - "\n"
+            - 'New-AWSQuickStartResourceSignal -Resource "SolrDevASG" -Stack '
+            - !Sub '"${AWS::StackName}" -Region '
+            - !Sub '"${AWS::Region}"'
+            - "\n"
+            - "Write-AWSQuickStartStatus"
+            - "\n"
+            - "</powershell>\n"

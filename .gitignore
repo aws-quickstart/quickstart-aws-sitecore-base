@@ -5,4 +5,3 @@ helm/
 .DS_Store
 scratch/
 *scratch*.ps1
-*.zip

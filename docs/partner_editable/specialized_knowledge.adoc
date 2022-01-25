@@ -1,0 +1,15 @@
+// Replace the content in <>
+// Describe or link to specific knowledge requirements; for example: “familiarity with basic concepts in the areas of networking, database operations, and data encryption” or “familiarity with <software>.”
+
+This Quick Start assumes familiarity with PowerShell, Apache Solr, and _{partner-product-name}_ roles
+and configurations. It also requires a moderate level of familiarity with AWS services. If
+you’re new to AWS, visit the https://aws.amazon.com/getting-started/[Getting Started Resource Center] and the https://aws.amazon.com/training/[AWS Training and
+Certification website]. These sites provide materials for learning how to design, deploy, and
+operate your infrastructure and applications on the AWS Cloud.
+
+In some scenarios you may want to deploy Sitecore into an existing VPC, which has a selfmanaged DNS rather than a Route 53–connected hosted zone. When deploying this Quick
+Start into an existing VPC, set `VPCPrivateDNS` to *true*. Then create DNS Canonical Name
+Record (CNAME) entries in your self-managed DNS. For more information, see Step 
+<<_post_deployment_steps,Post-deployment steps>>.
+
+
