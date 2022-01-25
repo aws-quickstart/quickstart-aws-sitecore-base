@@ -154,8 +154,10 @@ Resources:
         config:
           ignore_checks:
             - EIAMPolicyWildcardResource
+            - EIAMPolicyActionWildcard
           ignore_reasons:
             EIAMPolicyWildcardResource: Read-Only access required for all resources
+            EIAMPolicyActionWildcard: Multiple message actions required
     Properties:
       AssumeRolePolicyDocument:
         Statement:
